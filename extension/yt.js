@@ -68,7 +68,7 @@
     /**
      * onElementReady - Wait for element to appear in DOM
      */
-    const onElementReady = (selector, multiple = false, callback) => {
+    const onElementReady = (selector, multiple = false, callback = () => { }) => {
         const runCallback = () => {
             if (multiple) {
                 const elements = document.querySelectorAll(selector);
@@ -311,7 +311,7 @@
                 color: #f1f1f1;
             }
         }
-    `
+    `;
 
     const modeAvailable = [
         { value: 'asc', label: 'Shortest First' },
@@ -321,7 +321,7 @@
     const autoScrollOptions = [
         { value: 'true', label: 'Sort all' },
         { value: 'false', label: 'Sort only loaded' }
-    ]
+    ];
 
     // NEW YouTube architecture selectors
     const NEW_PAGE_HEADER_SELECTOR = 'yt-flexible-actions-view-model';
@@ -350,6 +350,7 @@
     let logEntries = []; // Store all log messages with metadata
     let verboseMode = false; // Default to non-verbose mode
     let autoScrollLog = true; // Default to auto-scroll enabled
+    let logVisible = false; // Default to log hidden
 
     let stopSort = false;
 
@@ -566,9 +567,9 @@
             parent = document.querySelector('div.thumbnail-and-metadata-wrapper');
 
             if (!parent) {
-                parent = document.querySelector(PLAYLIST_ACTIONS_SELECTOR)
-                    || document.querySelector(`${PLAYLIST_HEADER_SELECTOR} #container`)
-                    || document.querySelector(PLAYLIST_HEADER_SELECTOR);
+                parent = document.querySelector(PLAYLIST_ACTIONS_SELECTOR) ||
+                    document.querySelector(`${PLAYLIST_HEADER_SELECTOR} #container`) ||
+                    document.querySelector(PLAYLIST_HEADER_SELECTOR);
             }
         }
 
@@ -624,7 +625,7 @@
         }
 
         return element;
-    }
+    };
 
     /**
      * Generate button element
@@ -719,22 +720,28 @@
      * Generate log element
      */
     let renderLogElement = () => {
-        // Create container for log and clear button
+        // Create container for log and buttons
         const logContainer = document.createElement('div');
         logContainer.style.marginTop = '8px';
 
-        // Create clear log button
-        const clearButton = document.createElement('button');
-        clearButton.className = 'style-scope sort-button-wl sort-button-wl-default';
-        clearButton.style.fontSize = '11px';
-        clearButton.style.padding = '4px 8px';
-        clearButton.style.marginBottom = '4px';
-        clearButton.style.marginRight = '4px';
-        clearButton.innerText = 'Clear Log';
-        clearButton.onclick = () => {
-            clearLog();
-            logActivity('Log cleared');
+        // Create toggle visibility button
+        const toggleButton = document.createElement('button');
+        toggleButton.className = 'style-scope sort-button-wl sort-button-wl-default';
+        toggleButton.style.fontSize = '11px';
+        toggleButton.style.padding = '4px 8px';
+        toggleButton.style.marginBottom = '4px';
+        toggleButton.style.marginRight = '4px';
+        toggleButton.innerText = logVisible ? 'Hide Log' : 'Show Log';
+        toggleButton.onclick = () => {
+            logVisible = !logVisible;
+            toggleButton.innerText = logVisible ? 'Hide Log' : 'Show Log';
+            logControlsContainer.style.display = logVisible ? 'block' : 'none';
+            log.style.display = logVisible ? 'block' : 'none';
         };
+
+        // Create container for log controls (buttons and checkboxes)
+        const logControlsContainer = document.createElement('div');
+        logControlsContainer.style.display = logVisible ? 'block' : 'none';
 
         // Create copy log button
         const copyButton = document.createElement('button');
@@ -804,12 +811,16 @@
         log.className = 'style-scope sort-log';
         log.textContent = DEFAULT_LOG_MESSAGE;
         log.classList.add('sort-log-empty');
+        log.style.display = logVisible ? 'block' : 'none';
+
+        // Add log controls to their container
+        logControlsContainer.appendChild(copyButton);
+        logControlsContainer.appendChild(scrollContainer);
+        logControlsContainer.appendChild(verboseContainer);
 
         // Render elements
-        logContainer.appendChild(clearButton);
-        logContainer.appendChild(copyButton);
-        logContainer.appendChild(scrollContainer);
-        logContainer.appendChild(verboseContainer);
+        logContainer.appendChild(toggleButton);
+        logContainer.appendChild(logControlsContainer);
         logContainer.appendChild(log);
         document.querySelector('div.sort-playlist').appendChild(logContainer);
     };
@@ -860,7 +871,7 @@
             let timeDigits = timeSpan.innerText.trim().split(":").reverse();
             let time;
             if (timeDigits.length === 1) {
-                sortMode === "asc" ? time = 999999999999999999 : time = -1;
+                time = sortMode === "asc" ? 999999999999999999 : -1;
             } else {
                 time = parseInt(timeDigits[0]);
                 if (timeDigits[1]) time += parseInt(timeDigits[1]) * 60;
@@ -884,7 +895,17 @@
 
             if (originalIndex !== j) {
                 let elemDrag = videos[j].anchor;
-                let elemDrop = videos.find((v) => v.originalIndex === j).anchor;
+                let elemDrop = null;
+                for (let k = 0; k < videos.length; k++) {
+                    if (videos[k].originalIndex === j) {
+                        elemDrop = videos[k].anchor;
+                        break;
+                    }
+                }
+
+                if (!elemDrop) {
+                    continue;
+                }
 
                 simulateDrag(elemDrag, elemDrop);
                 dragged = true;
@@ -902,7 +923,7 @@
         }
 
         return sorted;
-    }
+    };
 
     /**
      * There is an inherent limit in how fast you can sort the videos, due to Youtube refreshing
@@ -972,9 +993,11 @@
 
         // Always check for new content first (whether "Sort all" or "Sort only loaded")
         // Keep scrolling until no new videos load for 3 consecutive attempts
-        while (document.URL.includes("playlist?list=")
-            && stopSort === false
-            && scrollRetryCount < maxScrollRetries) {
+        while (
+            document.URL.includes("playlist?list=") &&
+            stopSort === false &&
+            scrollRetryCount < maxScrollRetries
+        ) {
 
             let previousCount = videoPairs.length;
 
@@ -1188,8 +1211,8 @@
                     return;
                 }
                 addCssStyle();
-                renderButtonElement(async () => { await activateSort() }, 'Sort Videos', false);
-                renderButtonElement(() => { stopSort = true }, 'Stop Sort', true);
+                renderButtonElement(async () => { await activateSort(); }, 'Sort Videos', false);
+                renderButtonElement(() => { stopSort = true; }, 'Stop Sort', true);
                 renderSelectElement(0, modeAvailable, 'Sort Mode');
                 renderSelectElement(1, autoScrollOptions, 'Auto Scroll');
                 renderNumberElement(600, 'Scroll Retry Time (ms)');
@@ -1210,10 +1233,14 @@
      */
     (() => {
         init();
-        navigation.addEventListener('navigate', navigateEvent => {
-            const url = new URL(navigateEvent.destination.url);
-            if (url.pathname.includes('playlist?')) init();
-        });
+        if (window.navigation && typeof window.navigation.addEventListener === 'function') {
+            window.navigation.addEventListener('navigate', navigateEvent => {
+                const url = new URL(navigateEvent.destination.url);
+                if (url.pathname.includes('playlist?')) {
+                    init();
+                }
+            });
+        }
     })();
 
 })(); // Close the main IIFE wrapper
