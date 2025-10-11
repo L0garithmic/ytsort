@@ -2,10 +2,6 @@
 
 ![Image](https://i.imgur.com/zI8wnkh.jpeg)
 
-https://greasyfork.org/en/scripts/552228-sort-youtube-playlist-by-duration-advanced
-
-https://github.com/L0garithmic/ytsort
-
 Never hand-sort a playlist again. This userscript keeps YouTube playlist management sane by forcing YouTube to sort playlist items by video duration. It was a slog to get here, but the end result is a battle-tested script that survives YouTube's ever-shifting UI and lazy-loading antics. Chrome is the only browser confirmed to work right now. ⚙️
 
 ## Highlights ✨
@@ -57,6 +53,10 @@ Never hand-sort a playlist again. This userscript keeps YouTube playlist managem
 
 ## Contributing 🤝
 Pull requests fixing edge cases or adding cross-browser support are very welcome. If you encounter a breakage caused by a YouTube change, please describe the playlist size, layout, and steps to reproduce it.
+
+https://greasyfork.org/en/scripts/552228-sort-youtube-playlist-by-duration-advanced
+
+https://github.com/L0garithmic/ytsort
 
 ## License 📄
 Released under the GPL-2.0-only license. See the script header for details.
