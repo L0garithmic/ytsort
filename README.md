@@ -10,14 +10,23 @@ Never hand-sort a playlist again. This userscript keeps YouTube playlist managem
 - Defensive retry logic with detailed progress updates so you always know what it is doing.
 
 ## Requirements 🧰
-- Chrome with a userscript manager such as Tampermonkey or Violentmonkey.
+- Chrome with a userscript manager (Tampermonkey or Violentmonkey) **OR** load as an unpacked extension.
 - A YouTube playlist that you have permission to edit.
 
 ## Installation 🚀
+
+### Option 1: Userscript (Recommended for auto-updates)
 1. Install a userscript manager extension in Chrome (Tampermonkey recommended).
-2. Open the `yt.js` file from this repository and copy its contents.
+2. Open the `extension/yt.js` file from this repository and copy its contents.
 3. In Tampermonkey, create a new script and paste the copied code.
 4. Save the script. It will run automatically on YouTube once enabled.
+
+### Option 2: Unpacked Chrome Extension
+1. Download or clone this repository.
+2. Open Chrome and navigate to `chrome://extensions/`.
+3. Enable "Developer mode" in the top right.
+4. Click "Load unpacked" and select the `extension` folder from this repository.
+5. The extension will now run automatically on YouTube.
 
 ## Usage ▶️
 1. Open any editable YouTube playlist in Chrome.
