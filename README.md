@@ -2,6 +2,7 @@
 
 ![Image](https://i.imgur.com/zI8wnkh.jpeg)
 
+## Userscript & Chrome Plugin ✅ 
 Never hand-sort a playlist again. This userscript keeps YouTube playlist management sane by forcing YouTube to sort playlist items by video duration. It was a slog to get here, but the end result is a battle-tested script that survives YouTube's ever-shifting UI and lazy-loading antics. Chrome is the only browser confirmed to work right now. ⚙️
 
 ## Highlights ✨
