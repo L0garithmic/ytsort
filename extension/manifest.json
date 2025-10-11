@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Sort YouTube Playlists by Duration",
+  "description": "Sorts YouTube playlists by duration with improved lazy-load handling.",
+  "version": "3.5.0",
+  "author": "L0garithmic",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.youtube.com/*",
+        "http://*.youtube.com/*"
+      ],
+      "js": [
+        "yt.js"
+      ],
+      "run_at": "document_start"
+    }
+  ]
+}
