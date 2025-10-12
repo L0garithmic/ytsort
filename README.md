@@ -3,61 +3,61 @@
 ![Image](https://i.imgur.com/zI8wnkh.jpeg)
 
 ## Userscript & Chrome Plugin ✅ 
-Never hand-sort a playlist again. This userscript keeps YouTube playlist management sane by forcing YouTube to sort playlist items by video duration. It was a slog to get here, but the end result is a battle-tested script that survives YouTube's ever-shifting UI and lazy-loading antics. Chrome is the only browser confirmed to work right now. ⚙️
 
-## Highlights ✨
-- Sorts any YouTube playlist by duration in ascending or descending order.
-- Handles modern and legacy playlist layouts without user intervention.
-- Fully loads long playlists by auto-scrolling and verifying video counts before sorting.
-- Injects streamlined controls into the playlist page with status logging and copy-to-clipboard support.
-- Defensive retry logic with detailed progress updates so you always know what it is doing.
-
-## Requirements 🧰
-- Chrome with a userscript manager (Tampermonkey or Violentmonkey) **OR** load as an unpacked extension.
-- A YouTube playlist that you have permission to edit.
+## Key Features ✨
+- **Smart Sorting** - Ascending/descending by duration with alphabetical tiebreaker
+- **Settings Panel** - Persistent preferences (sort mode, auto-scroll, log verbosity)
+- **Dry Run Mode** - Preview changes before applying (v4.5.0)
+- **Duration Filters** - Include only videos within specific length ranges (v4.3.0)
+- **Analytics** - Stats on total duration, avg length, shortest/longest videos (v4.2.0)
+- **CSV Export** - Export playlist data for external analysis (v4.4.0)
+- **Real-time Logging** - Copy-to-clipboard support with 1000 message retention
 
 ## Installation 🚀
 
-### Option 1: Userscript (Recommended for auto-updates)
-1. Install a userscript manager extension in Chrome (Tampermonkey recommended).
-2. Open the `extension/yt.js` file from this repository and copy its contents.
-3. In Tampermonkey, create a new script and paste the copied code.
-4. Save the script. It will run automatically on YouTube once enabled.
+**Option 1: Userscript (Recommended)**
+1. Install [Tampermonkey](https://www.tampermonkey.net/) in Chrome
+2. Copy contents of `extension/yt.js` and create new Tampermonkey script
+3. Save and it runs automatically on YouTube
 
-### Option 2: Unpacked Chrome Extension
-1. Download or clone this repository.
-2. Open Chrome and navigate to `chrome://extensions/`.
-3. Enable "Developer mode" in the top right.
-4. Click "Load unpacked" and select the `extension` folder from this repository.
-5. The extension will now run automatically on YouTube.
+**Option 2: Chrome Extension**
+1. Clone/download this repository
+2. Go to `chrome://extensions/` → Enable "Developer mode"
+3. Click "Load unpacked" → Select `extension` folder
 
 ## Usage ▶️
-1. Open any editable YouTube playlist in Chrome.
-2. Expand the "Sort Playlist by Duration" panel the script injects below the playlist header.
-3. Pick the sort order: `Shortest First` or `Longest First`.
-4. Choose whether to load the entire playlist or only the currently visible videos.
-5. Click `Sort` and let the script do the painful part:
-  - It reloads the playlist content, scrolls to load everything, and double-checks counts.
-  - Once stable, it simulates the drag-and-drop operations to reorder entries.
-6. Watch the log to follow progress or copy it if you need to troubleshoot.
+1. Open any editable YouTube playlist in Chrome
+2. Expand the "Sort Playlist by Duration" panel injected below playlist header
+3. **Optional**: Configure Settings, view Stats, or set duration filters
+4. Select sort order: `Shortest First` or `Longest First`
+5. Choose: `Sort all` (loads entire playlist) or `Sort only loaded` (current videos)
+6. **Recommended**: Enable Dry Run to preview changes before applying
+7. Click `Sort` and watch the real-time log
+8. **Optional**: Export playlist data as CSV
 
-## Known Limitations ⚠️
-- Chrome-only for now. Other browsers might work, but they have not been validated yet.
-- Gigantic playlists can still stress YouTube's UI; the script keeps retries finite to avoid infinite loops.
-- YouTube UI changes may break selectors. If that happens, file an issue or tweak the selectors in `yt.js`.
+**Note**: After sorting, don't switch back to YouTube's auto-sort (Date Added, etc.) - manual sorting is permanent.
 
 ## Troubleshooting 🧯
-- Make sure Tampermonkey reports that the script is active on youtube.com.
-- Reload the playlist page if the controls do not appear.
-- Clear the log and try again if YouTube looks stuck; occasionally YouTube blocks drag events until the page is refreshed.
-- Open the browser console for additional errors; the script logs detailed messages that can be copied with the on-page button.
+- Verify Tampermonkey shows script active on youtube.com
+- Reload page if controls don't appear
+- Use Dry Run mode to preview before applying changes
+- Adjust Settings panel for scroll retry times or log verbosity
+- Use Copy Console button for detailed logs
+- Check browser console for additional error messages
 
-## Contributing 🤝
-Pull requests fixing edge cases or adding cross-browser support are very welcome. If you encounter a breakage caused by a YouTube change, please describe the playlist size, layout, and steps to reproduce it.
+## Recent Updates 📋
 
-https://greasyfork.org/en/scripts/552228-sort-youtube-playlist-by-duration-advanced
+**v4.5.0** (Oct 2025) - Settings Panel & Dry Run Mode  
+**v4.4.0** - CSV Export & improved move counter  
+**v4.3.0** - Duration filters (min/max length)  
+**v4.2.0** - Playlist statistics button  
+**v4.1.0** - Copy Console & lazy loading fixes
 
-https://github.com/L0garithmic/ytsort
+[Full changelog in yt.js](extension/yt.js)
+
+## Links 🔗
+- [Greasy Fork](https://greasyfork.org/en/scripts/552228-sort-youtube-playlist-by-duration-advanced)
+- [GitHub](https://github.com/L0garithmic/ytsort)
 
 ## License 📄
-Released under the GPL-2.0-only license. See the script header for details.
+GPL-2.0-only
