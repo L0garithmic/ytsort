@@ -1,6 +1,6 @@
 # Sort YouTube Playlist by Duration (Advanced) 🎧
 
-![Image](https://i.imgur.com/zI8wnkh.jpeg)
+![Image](https://i.imgur.com/MDiqTOt.jpeg)
 
 ## Userscript & Chrome Plugin ✅ 
 
