@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Sort YouTube Playlists by Duration",
-  "description": "Sorts YouTube playlists by duration with improved lazy-load handling.",
-  "version": "3.5.0",
+  "description": "Sorts YouTube playlists by duration with settings panel, dry run mode, and improved lazy-load handling.",
+  "version": "4.5.0",
   "author": "L0garithmic",
   "content_scripts": [
     {
