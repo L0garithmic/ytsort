@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name              Sort Youtube Playlist by Duration (Advanced)
 // @namespace         https://github.com/L0garithmic/ytsort/
-// @version           4.5.0
+// @version           4.6.0
 // @description       Sorts youtube playlist by duration
 // @author            L0garithmic
 // @license           GPL-2.0-only
@@ -15,6 +15,11 @@
 // ==/UserScript==
 
 /**
+ *  Changelog 10/19/2025 (v4.6.0)
+ *  - Added missing-video tolerance setting with 0-100% range (default 10%)
+ *  - Adaptive reload now accepts tolerance to keep sorts moving on partial loads
+ *  - Improved logging when sorting proceeds under the configured tolerance
+ *
  *  Changelog 10/12/2025 (v4.5.0)
  *  - Added Settings Panel for persistent configuration management
  *  - Settings saved to localStorage and persist across sessions
@@ -105,7 +110,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = '4.5.0';
+    const SCRIPT_VERSION = '4.6.0';
 
     // Settings management with localStorage
     const SETTINGS_KEY = 'yt_playlist_sorter_settings';
@@ -122,7 +127,8 @@
         dryRunEnabled: false,
         filterEnabled: false,
         filterMinDuration: 0,
-        filterMaxDuration: 36000
+        filterMaxDuration: 36000,
+        mismatchTolerancePercent: 10
     };
 
     /**
@@ -168,7 +174,8 @@
             dryRunEnabled,
             filterEnabled,
             filterMinDuration,
-            filterMaxDuration
+            filterMaxDuration,
+            mismatchTolerancePercent
         };
     };
 
@@ -186,6 +193,7 @@
         filterEnabled = settings.filterEnabled;
         filterMinDuration = settings.filterMinDuration;
         filterMaxDuration = settings.filterMaxDuration;
+        mismatchTolerancePercent = settings.mismatchTolerancePercent;
     };
 
     // Load settings on initialization
@@ -708,6 +716,7 @@
     let filterEnabled = savedSettings.filterEnabled;
     let filterMinDuration = savedSettings.filterMinDuration; // in seconds
     let filterMaxDuration = savedSettings.filterMaxDuration; // in seconds (max)
+    let mismatchTolerancePercent = savedSettings.mismatchTolerancePercent ?? DEFAULT_SETTINGS.mismatchTolerancePercent;
 
     // Multi-criteria sorting
     let useTitleTiebreaker = true; // Always enabled by default
@@ -774,6 +783,91 @@
         if (!filterEnabled) return true;
         if (duration === null) return false; // Exclude videos without duration
         return duration >= filterMinDuration && duration <= filterMaxDuration;
+    };
+
+    /**
+     * Determine if the current playlist count satisfies the configured mismatch tolerance
+     * @param {number} expected - Target number of videos to load
+     * @param {number} actual - Number of videos currently loaded
+     * @returns {boolean} True when the difference is within tolerance limits
+     */
+    const isWithinMismatchTolerance = (expected, actual) => {
+        if (expected <= 0) return true;
+        if (mismatchTolerancePercent >= 100) return true;
+        const clampedTolerance = Math.min(Math.max(mismatchTolerancePercent, 0), 100);
+        const allowedMissing = Math.ceil((clampedTolerance / 100) * expected);
+        return actual + allowedMissing >= expected;
+    };
+
+    /**
+     * Snapshot current playlist DOM state for reuse
+     * @returns {{videoPairs: Array, dragPoints: Element[], anchors: Element[], items: Element[], count: number}}
+     */
+    const collectPlaylistState = () => {
+        const videoPairs = getPlaylistVideoPairs();
+        return {
+            videoPairs,
+            dragPoints: videoPairs.map(pair => pair.drag),
+            anchors: videoPairs.map(pair => pair.anchor),
+            items: videoPairs.map(pair => pair.item),
+            count: videoPairs.length
+        };
+    };
+
+    /**
+     * Attempt to keep the full playlist loaded by scrolling with adaptive delays
+     * @param {number} targetCount - Desired number of videos in DOM
+     * @param {number} [maxAttempts=5] - Maximum reload attempts before giving up
+     * @returns {Promise<{state: Object, loadedCount: number, bestCount: number, attempts: number}>}
+     */
+    const ensureFullPlaylistLoaded = async (targetCount, maxAttempts = 5) => {
+        let attempt = 0;
+        let state = collectPlaylistState();
+        let bestState = state;
+        let bestCount = state.count;
+
+        while (attempt < maxAttempts && bestCount < targetCount && stopSort === false) {
+            if (isWithinMismatchTolerance(targetCount, bestCount)) {
+                break;
+            }
+            const adaptiveDelay = Math.min(scrollLoopTime * (1 + attempt * 0.75), scrollLoopTime * 4);
+
+            await autoScroll(null, adaptiveDelay);
+
+            if (document.scrollingElement) {
+                document.scrollingElement.scrollTop = 0;
+            }
+
+            await wait(adaptiveDelay);
+
+            await autoScroll(null, adaptiveDelay);
+
+            if (document.scrollingElement) {
+                document.scrollingElement.scrollTop = 0;
+            }
+
+            await wait(Math.max(150, adaptiveDelay / 2));
+
+            state = collectPlaylistState();
+            if (state.count > bestCount) {
+                bestCount = state.count;
+                bestState = state;
+
+                if (bestCount >= targetCount || isWithinMismatchTolerance(targetCount, bestCount)) {
+                    break;
+                }
+            }
+
+            attempt++;
+        }
+
+        return {
+            state: bestState,
+            loadedCount: bestState.count,
+            bestCount,
+            attempts: attempt,
+            withinTolerance: isWithinMismatchTolerance(targetCount, bestState.count)
+        };
     };
 
     /**
@@ -864,21 +958,22 @@
      * @param {number|null} scrollTop - Target scroll position (null for bottom of page)
      * @returns {Promise<void>} Resolves when scrolling is complete
      */
-    let autoScroll = async (scrollTop = null) => {
-        let element = document.scrollingElement;
+    let autoScroll = async (scrollTop = null, customDelay = null) => {
+        const element = document.scrollingElement;
         if (!element) return;
 
+        const delay = customDelay !== null ? customDelay : scrollLoopTime;
         let currentScroll = element.scrollTop;
-        let scrollDestination = scrollTop !== null ? scrollTop : element.scrollHeight;
+        const scrollDestination = scrollTop !== null ? scrollTop : element.scrollHeight;
         let scrollCount = 0;
-        let maxAttempts = 3; // Reduced from implicit infinite to 3 attempts
+        const maxAttempts = 3; // Reduced from implicit infinite to 3 attempts
 
         do {
             if (stopSort) break; // Check stopSort at the start of each iteration
 
             currentScroll = element.scrollTop;
             element.scrollTop = scrollDestination;
-            await wait(scrollLoopTime);
+            await wait(delay);
             scrollCount++;
 
             // If we haven't moved in 2 attempts, we're probably at the bottom
@@ -1539,6 +1634,23 @@
         otherTitle.textContent = 'Other Preferences';
         otherSection.appendChild(otherTitle);
 
+        // Mismatch tolerance percent
+        const toleranceRow = document.createElement('div');
+        toleranceRow.className = 'sort-settings-row';
+        const toleranceLabel = document.createElement('span');
+        toleranceLabel.className = 'sort-settings-label';
+        toleranceLabel.textContent = 'Missing Video Tolerance (%):';
+        const toleranceInput = document.createElement('input');
+        toleranceInput.type = 'number';
+        toleranceInput.className = 'sort-number-input';
+        toleranceInput.min = '0';
+        toleranceInput.max = '100';
+        toleranceInput.step = '1';
+        toleranceInput.value = mismatchTolerancePercent;
+        toleranceRow.appendChild(toleranceLabel);
+        toleranceRow.appendChild(toleranceInput);
+        otherSection.appendChild(toleranceRow);
+
         // Dry Run Mode
         const dryRunRow = document.createElement('div');
         dryRunRow.className = 'sort-settings-row';
@@ -1581,6 +1693,7 @@
             sortMode = sortModeSelect.value;
             autoScrollInitialVideoList = autoScrollSelect.value;
             scrollLoopTime = parseInt(scrollTimeInput.value);
+            mismatchTolerancePercent = Math.min(100, Math.max(0, parseInt(toleranceInput.value) || 0));
             dryRunEnabled = dryRunCheckbox.checked;
             filterEnabled = filterEnableCheckbox.checked;
             filterMinDuration = Math.max(0, parseInt(minInput.value) || 0) * 60;
@@ -1914,7 +2027,7 @@
 
         // Scroll to load all videos
         while (scrollRetryCount < maxScrollRetries && stopSort === false) {
-            let previousCount = videoPairs.length;
+            let previousCount = playlistState.count;
 
             logActivity("Loading videos... " + videoPairs.length + " loaded so far", true, true);
 
@@ -2396,12 +2509,14 @@
             logActivity("🎯 Filter: " + formatTime(filterMinDuration) + " - " + formatTime(filterMaxDuration));
         }
 
-        let videoPairs = getPlaylistVideoPairs();
-        let allDragPoints = videoPairs.map(pair => pair.drag);
-        let allAnchors = videoPairs.map(pair => pair.anchor);
-        let allItems = videoPairs.map(pair => pair.item);
+        let playlistState = collectPlaylistState();
+        let videoPairs = playlistState.videoPairs;
+        let allDragPoints = playlistState.dragPoints;
+        let allAnchors = playlistState.anchors;
+        let allItems = playlistState.items;
         let sortedCount = 0;
-        let initialVideoCount = videoPairs.length;
+        let initialVideoCount = playlistState.count;
+        let highestLoadedCount = initialVideoCount;
         logActivity("📥 Currently loaded: " + initialVideoCount + " videos");
 
         let scrollRetryCount = 0;
@@ -2437,11 +2552,15 @@
                 await wait(scrollLoopTime);
             }
 
-            videoPairs = getPlaylistVideoPairs();
-            allDragPoints = videoPairs.map(pair => pair.drag);
-            allAnchors = videoPairs.map(pair => pair.anchor);
-            allItems = videoPairs.map(pair => pair.item);
-            initialVideoCount = videoPairs.length;
+            playlistState = collectPlaylistState();
+            videoPairs = playlistState.videoPairs;
+            allDragPoints = playlistState.dragPoints;
+            allAnchors = playlistState.anchors;
+            allItems = playlistState.items;
+            initialVideoCount = playlistState.count;
+            if (initialVideoCount > highestLoadedCount) {
+                highestLoadedCount = initialVideoCount;
+            }
 
             // Check if we're making progress
             if (previousCount === initialVideoCount) {
@@ -2557,83 +2676,76 @@
             logActivity("⚙️  Ensuring all videos are loaded before sort iteration...", true, true);
 
             if (autoScrollInitialVideoList === 'true') {
-                // Scroll to bottom to load all videos
-                await autoScroll();
-                await wait(scrollLoopTime);
+                const targetCount = Math.max(highestLoadedCount, initialVideoCount);
+                const reloadResult = await ensureFullPlaylistLoaded(targetCount);
 
-                // Scroll to top to ensure top videos are loaded too
-                if (document.scrollingElement) {
-                    document.scrollingElement.scrollTop = 0;
-                }
-                await wait(scrollLoopTime);
+                playlistState = reloadResult.state;
+                videoPairs = playlistState.videoPairs;
+                allDragPoints = playlistState.dragPoints;
+                allAnchors = playlistState.anchors;
+                allItems = playlistState.items;
+                const loadedCount = playlistState.count;
 
-                // Now get fresh references
-                videoPairs = getPlaylistVideoPairs();
-                allDragPoints = videoPairs.map(pair => pair.drag);
-                allAnchors = videoPairs.map(pair => pair.anchor);
-                allItems = videoPairs.map(pair => pair.item);
-                const loadedCount = videoPairs.length;
+                if (!reloadResult.withinTolerance) {
+                    reloadFailures++;
+                    logActivity("⚠️  Video count mismatch! Expected ≥ " + targetCount + ", got " + reloadResult.bestCount, true, true);
 
-                // Verify we have all videos
-                if (loadedCount !== initialVideoCount) {
-                    logActivity("⚠️  Video count mismatch! Expected: " + initialVideoCount + ", Got: " + loadedCount, true, true);
-                    logActivity("Re-loading playlist (attempt " + (reloadFailures + 1) + "/" + maxReloadFailures + ")...", true, true);
-
-                    // Try to reload with more aggressive scrolling
-                    await autoScroll();
-                    await wait(scrollLoopTime * 3); // Longer wait
-                    if (document.scrollingElement) {
-                        document.scrollingElement.scrollTop = 0;
-                    }
-                    await wait(scrollLoopTime * 3);
-
-                    // Scroll one more time to bottom and back
-                    await autoScroll();
-                    await wait(scrollLoopTime * 2);
-                    if (document.scrollingElement) {
-                        document.scrollingElement.scrollTop = 0;
-                    }
-                    await wait(scrollLoopTime * 2);
-
-                    videoPairs = getPlaylistVideoPairs();
-                    allDragPoints = videoPairs.map(pair => pair.drag);
-                    allAnchors = videoPairs.map(pair => pair.anchor);
-                    allItems = videoPairs.map(pair => pair.item);
-                    const reloadedCount = videoPairs.length;
-
-                    if (reloadedCount !== initialVideoCount) {
-                        reloadFailures++;
-                        if (reloadFailures >= maxReloadFailures) {
-                            logActivity("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-                            logActivity("❌ YouTube keeps unloading videos - playlist too large for current method");
-                            logActivity("💡 Solutions:");
-                            logActivity("   1. Refresh the page and try 'Sort only loaded' mode");
-                            logActivity("   2. Refresh and try again with a higher 'Scroll Retry Time' (1000-2000ms)");
-                            logActivity("   3. For playlists >200 videos, sort in smaller batches");
-                            logActivity("📊 Progress saved: Sorted " + sortedCount + " of " + initialVideoCount + " videos");
+                    if (reloadFailures >= maxReloadFailures) {
+                        logActivity("ℹ️  Switching to adaptive partial sort to keep progress.");
+                        logActivity("   Auto-scroll temporarily disabled for this run.");
+                        logActivity("   Tip: Increase 'Scroll Retry Time' in settings to retry full loads.");
+                        autoScrollInitialVideoList = 'false';
+                        initialVideoCount = reloadResult.bestCount;
+                        highestLoadedCount = reloadResult.bestCount;
+                        if (initialVideoCount === 0) {
+                            logActivity("❌ No videos remain loaded. Stopping sort.");
                             return;
                         }
-                        // If not max failures yet, continue the loop and try again
-                        logActivity("⚠️  Still can't load all videos. Will retry on next iteration...", true, true);
-                        continue; // Skip this iteration and try again
-                    } else {
-                        // Successfully reloaded, reset failure counter
+                        if (sortedCount >= initialVideoCount) {
+                            sortedCount = Math.max(0, initialVideoCount - 1);
+                        }
+                        globalTotalMoves = calculateTotalMoves(allAnchors, allItems);
                         reloadFailures = 0;
+                    } else {
+                        logActivity("Re-loading playlist (retry " + reloadFailures + "/" + maxReloadFailures + ")...", true, true);
+                        await wait(Math.min(scrollLoopTime * 2, 2000));
+                        continue;
                     }
                 } else {
-                    // Video count is correct, reset failure counter
                     reloadFailures = 0;
-                }
+                    if (loadedCount < targetCount && mismatchTolerancePercent > 0) {
+                        if (mismatchTolerancePercent >= 100) {
+                            logActivity("⚠️  Proceeding without mismatch enforcement (tolerance disabled).", true, true);
+                        } else {
+                            const missing = targetCount - loadedCount;
+                            logActivity("⚠️  Proceeding with " + loadedCount + " videos (missing " + missing + " within " + mismatchTolerancePercent + "% tolerance).", true, true);
+                        }
+                    }
 
-                logActivity("✓ All " + initialVideoCount + " videos confirmed loaded", true, true);
+                    if (loadedCount > highestLoadedCount) {
+                        logActivity("📈 Loaded " + (loadedCount - highestLoadedCount) + " additional videos during reload", true, true);
+                    }
+
+                    highestLoadedCount = loadedCount;
+
+                    if (loadedCount !== initialVideoCount) {
+                        initialVideoCount = loadedCount;
+                        if (sortedCount >= initialVideoCount) {
+                            sortedCount = Math.max(0, initialVideoCount - 1);
+                        }
+                        globalTotalMoves = calculateTotalMoves(allAnchors, allItems);
+                    }
+
+                    logActivity("✓ All " + initialVideoCount + " videos confirmed loaded", true, true);
+                }
             } else {
-                // Keep working set limited to what was already loaded
                 await wait(scrollLoopTime / 2);
-                videoPairs = getPlaylistVideoPairs();
-                allDragPoints = videoPairs.map(pair => pair.drag);
-                allAnchors = videoPairs.map(pair => pair.anchor);
-                allItems = videoPairs.map(pair => pair.item);
-                const loadedCount = videoPairs.length;
+                playlistState = collectPlaylistState();
+                videoPairs = playlistState.videoPairs;
+                allDragPoints = playlistState.dragPoints;
+                allAnchors = playlistState.anchors;
+                allItems = playlistState.items;
+                const loadedCount = playlistState.count;
 
                 if (loadedCount !== initialVideoCount) {
                     logActivity("ℹ️  Loaded video count changed from " + initialVideoCount + " to " + loadedCount + ". Using current loaded set.", true, true);
@@ -2641,6 +2753,7 @@
                     if (sortedCount >= initialVideoCount) {
                         sortedCount = Math.max(0, initialVideoCount - 1);
                     }
+                    globalTotalMoves = calculateTotalMoves(allAnchors, allItems);
                 }
 
                 if (initialVideoCount === 0) {
