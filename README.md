@@ -1,6 +1,6 @@
 # Sort YouTube Playlist by Duration (Advanced) 🎧
 
-![Image](https://i.imgur.com/MDiqTOt.jpeg)
+![Image](https://i.imgur.com/zI8wnkh.jpeg)
 
 ## Userscript & Chrome Plugin ✅ 
 
@@ -47,7 +47,8 @@
 
 ## Recent Updates 📋
 
-**v4.5.0** (Oct 2025) - Settings Panel & Dry Run Mode  
+**v4.6.0** (Oct 2025) - Missing video tolerance & adaptive reload tweaks  
+**v4.5.0** - Settings Panel & Dry Run Mode  
 **v4.4.0** - CSV Export & improved move counter  
 **v4.3.0** - Duration filters (min/max length)  
 **v4.2.0** - Playlist statistics button  
